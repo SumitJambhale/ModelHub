@@ -1,6 +1,7 @@
 import express, { Request, Response } from 'express';
 import cors from 'cors';
 import path from 'path';
+import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { createServer as createViteServer } from 'vite';
 import { ImapFlow } from 'imapflow';
@@ -450,11 +451,74 @@ app.post('/api/search', async (req: Request, res: Response) => {
 
 // ---------- Vite middleware / static serving ----------
 async function startServer() {
+  const distPath = path.resolve(__dirname, 'dist');
+  const indexPath = path.resolve(distPath, 'index.html');
+
   if (process.env.NODE_ENV === 'production') {
-    app.use(express.static(path.resolve(__dirname, 'dist')));
-    app.get('*', (_req: Request, res: Response) => {
-      res.sendFile(path.resolve(__dirname, 'dist', 'index.html'));
-    });
+    // If running in production on Render and dist has not been built yet, trigger auto-build
+    if (!fs.existsSync(indexPath)) {
+      console.log('⚡ dist/index.html not found at startup. Running automatic frontend build with Vite...');
+      try {
+        const { execSync } = await import('child_process');
+        execSync('npx vite build', { stdio: 'inherit' });
+        console.log('✅ Automatic frontend build completed successfully!');
+      } catch (buildErr: any) {
+        console.error('⚠️ Automatic build could not complete:', buildErr?.message || buildErr);
+      }
+    }
+
+    if (fs.existsSync(indexPath)) {
+      app.use(express.static(distPath));
+      app.get('*', (req: Request, res: Response) => {
+        if (req.path.startsWith('/api')) {
+          return res.status(404).json({ error: 'API route not found' });
+        }
+        res.sendFile(indexPath, (err) => {
+          if (err && !res.headersSent) {
+            res.status(500).send('Error loading application.');
+          }
+        });
+      });
+    } else {
+      // Safe fallback if deployed to Render without running npm run build
+      app.get('/', (_req: Request, res: Response) => {
+        res.send(`<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ModelHub Relay</title>
+  </head>
+  <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #09090b; color: #f4f4f5; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; padding: 24px; box-sizing: border-box;">
+    <div style="max-width: 580px; width: 100%; background: #18181b; border: 1px solid #27272a; border-radius: 16px; padding: 32px; box-shadow: 0 20px 40px rgba(0,0,0,0.5);">
+      <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 16px;">
+        <div style="width: 40px; height: 40px; border-radius: 10px; background: linear-gradient(135deg, #4f46e5, #9333ea); display: flex; align-items: center; justify-content: center; font-size: 20px;">⚡</div>
+        <div>
+          <h2 style="margin: 0; font-size: 18px; color: #ffffff;">ModelHub Backend Relay is Live</h2>
+          <p style="margin: 2px 0 0 0; font-size: 12px; color: #a1a1aa;">All API endpoints and proxy services are operating normally.</p>
+        </div>
+      </div>
+      <div style="background: #09090b; border: 1px solid #27272a; border-radius: 10px; padding: 14px 16px; font-family: monospace; font-size: 13px; color: #34d399; margin: 20px 0;">
+        ✓ Status: Online (Port ${PORT})<br/>
+        ✓ Endpoints: /api/chat, /api/test-key, /api/email/fetch, /api/health
+      </div>
+      <div style="background: #27272a40; border-left: 3px solid #6366f1; padding: 12px 14px; border-radius: 6px; font-size: 13px; color: #d4d4d8; line-height: 1.6;">
+        <strong>To serve the full frontend UI from Render:</strong><br/>
+        Set your Render Web Service <em>Build Command</em> to:<br/>
+        <code style="display: inline-block; margin-top: 6px; background: #09090b; border: 1px solid #3f3f46; color: #a5b4fc; padding: 4px 8px; border-radius: 6px; font-size: 12px;">npm install && npm run build</code>
+      </div>
+    </div>
+  </body>
+</html>`);
+      });
+
+      app.get('*', (req: Request, res: Response) => {
+        if (req.path.startsWith('/api')) {
+          return res.status(404).json({ error: 'API route not found' });
+        }
+        res.redirect('/');
+      });
+    }
   } else {
     const vite = await createViteServer({
       server: { middlewareMode: true },

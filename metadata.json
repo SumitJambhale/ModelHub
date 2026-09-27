@@ -2,5 +2,7 @@
   "name": "ModelHub",
   "description": "Multi-model AI chat hub supporting GPT, Claude, Gemini, and Grok with document grounding, web search, and email assistance.",
   "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
 }
