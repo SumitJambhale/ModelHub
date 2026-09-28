@@ -180,6 +180,11 @@ Express endpoints used by the harness for CORS-sensitive or server-side work:
 
 **Harness = everything around the models** — routing, context packing, tool-like features, persistence, and recovery — mainly in `App.tsx` and `aiProviders.ts`, with capabilities in `documentParser`, `webSearch`, and `EmailDrawer`.
 
+## Demo Link
+
+https://modelhub-9rxi.onrender.com/
+
+
 ## License
 
 Apache-2.0 (see file headers in source).
